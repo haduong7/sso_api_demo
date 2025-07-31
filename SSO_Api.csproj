@@ -4,8 +4,8 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <!-- Suppress common warnings that can break Railway builds -->
-    <NoWarn>$(NoWarn);CS8632;CS0168;CS0219;CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8625</NoWarn>
+    <!-- Suppress all warnings that can break Railway builds -->
+    <NoWarn>$(NoWarn);CS8632;CS0168;CS9113;CS0618;SYSLIB0021;CS0219;NU1603</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
