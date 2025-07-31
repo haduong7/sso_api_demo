@@ -19,7 +19,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // 1) Đọc connection-string
 //var conn = builder.Configuration.GetConnectionString("default");
-var conn = Environment.GetEnvironmentVariable("CONNECTION_STRING");
+var conn = Environment.GetEnvironmentVariable("DATABASE_URL");
 
 // 2) Đăng ký DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
