@@ -2,13 +2,13 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /app
 
-# Copy project file and restore dependencies
-COPY *.csproj ./
-RUN dotnet restore
+# Copy project file and restore dependencies (not solution)
+COPY SSO_Api.csproj ./
+RUN dotnet restore SSO_Api.csproj
 
 # Copy source code and build
 COPY . ./
-RUN dotnet publish -c Release -o out
+RUN dotnet publish SSO_Api.csproj -c Release -o out
 
 # Use .NET 8 runtime for final image
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
