@@ -12,6 +12,7 @@ using SSO_Api.Repositories.RepositorySystemEF;
 using System.Text;
 using WebApi.Helpers;
 using System;
+using Npgsql; // ✳️ Add this for PostgreSQL
 
 
 
@@ -21,9 +22,9 @@ var builder = WebApplication.CreateBuilder(args);
 //var conn = builder.Configuration.GetConnectionString("default");
 var conn = Environment.GetEnvironmentVariable("DATABASE_URL");
 
-// 2) Đăng ký DbContext
+// 2) Đăng ký DbContext - ✳️ Changed to UseNpgsql for PostgreSQL
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(conn)
+    options.UseNpgsql(conn)  // ✳️ Changed from UseSqlServer
 );
 
 //var connectionString = builder.Configuration.GetConnectionString("default");
@@ -35,8 +36,9 @@ builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.PropertyNamingPolicy = null;
 }); ;
 
-builder.Services.AddDbContext<AppDbContext>(
-    options => options.UseSqlServer(conn));
+// ✳️ Remove duplicate DbContext registration - it's already done above
+// builder.Services.AddDbContext<AppDbContext>(
+//     options => options.UseSqlServer(conn));
 
 // 1) Đăng ký IHttpContextAccessor nếu bạn cần dùng HttpContext
 builder.Services.AddHttpContextAccessor();
@@ -55,13 +57,16 @@ builder.Services.AddScoped<IDeXuatManagement, DeXuatManagement>();
 
 // ✳️ Đăng ký cấu hình appsettings (bind vào class JWTAppSetting)
 builder.Services.Configure<JWTAppSetting>(builder.Configuration.GetSection("JWTAppSetting"));
-// ✳️ Add CORS policy
+
+// ✳️ Add CORS policy - Updated with dynamic origins
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("CorsPolicy", builder =>
     {
-        builder.WithOrigins("http://localhost:4200",
-                            "https://your-app-name.railway.app")
+        var allowedOrigins = Environment.GetEnvironmentVariable("ALLOWED_ORIGINS")?.Split(',') 
+            ?? new[] { "http://localhost:4200" };
+            
+        builder.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials()
@@ -115,6 +120,21 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// ✳️ Database initialization
+if (!string.IsNullOrEmpty(conn))
+{
+    try
+    {
+        var dbInitializer = new DatabaseInitializer(conn);
+        await dbInitializer.InitializeDatabaseAsync();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Database initialization failed: {ex.Message}");
+        // Don't throw - let the app continue running
+    }
+}
+
 // ✳️ Global CORS policy
 app.UseCors("CorsPolicy");
 // ✳️ Custom JWT middleware
@@ -142,3 +162,46 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();
+
+
+// ✳️ Database Initializer Class
+public class DatabaseInitializer
+{
+    private readonly string _connectionString;
+
+    public DatabaseInitializer(string connectionString)
+    {
+        _connectionString = connectionString;
+    }
+
+    public async Task InitializeDatabaseAsync()
+    {
+        try
+        {
+            // Read the SQL file from your project
+            var sqlScript = await File.ReadAllTextAsync("schema.sql");
+            
+            using var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync();
+            
+            // Split the script by semicolons and execute each statement
+            var statements = sqlScript.Split(';', StringSplitOptions.RemoveEmptyEntries);
+            
+            foreach (var statement in statements)
+            {
+                if (!string.IsNullOrWhiteSpace(statement))
+                {
+                    using var command = new NpgsqlCommand(statement.Trim(), connection);
+                    await command.ExecuteNonQueryAsync();
+                }
+            }
+            
+            Console.WriteLine("Database initialized successfully!");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Database initialization failed: {ex.Message}");
+            throw;
+        }
+    }
+}
